@@ -9,10 +9,23 @@ body {
   color: #e0e0e0;
   font-family: system-ui, -apple-system, sans-serif;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
   user-select: none;
+}
+
+.title {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  margin-bottom: 18px;
+  background: linear-gradient(90deg, #7aa2f7, #bb9af7, #e57373, #e0af68, #9ece6a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 .wrapper {
