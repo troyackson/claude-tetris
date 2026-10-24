@@ -15,6 +15,18 @@ const COLORS = [
   '#ffb74d', // L - orange
 ];
 
+// Paleta más saturada para contraste sobre fondo claro
+const COLORS_LIGHT = [
+  null,
+  '#00acc1', // I
+  '#f9a825', // O
+  '#8e24aa', // T
+  '#43a047', // S
+  '#e53935', // Z
+  '#3949ab', // J
+  '#fb8c00', // L
+];
+
 const PIECES = [
   null,
   [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], // I
@@ -39,6 +51,10 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const themeToggle = document.getElementById('theme-toggle');
+
+let theme = 'dark';
+let themeColors = { grid: '#22222e', highlight: 'rgba(255,255,255,0.12)' };
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 
@@ -158,18 +174,18 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
+  const color = (theme === 'light' ? COLORS_LIGHT : COLORS)[colorIndex];
   context.globalAlpha = alpha ?? 1;
   context.fillStyle = color;
   context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
   // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
+  context.fillStyle = themeColors.highlight;
   context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
   context.globalAlpha = 1;
 }
 
 function drawGrid() {
-  ctx.strokeStyle = '#22222e';
+  ctx.strokeStyle = themeColors.grid;
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -256,6 +272,27 @@ function loop(ts) {
   animId = requestAnimationFrame(loop);
 }
 
+function applyTheme(name, persist) {
+  theme = name === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = theme;
+  const style = getComputedStyle(document.documentElement);
+  themeColors = {
+    grid: style.getPropertyValue('--grid').trim(),
+    highlight: style.getPropertyValue('--highlight').trim(),
+  };
+  themeToggle.textContent = theme === 'light' ? '☾ Modo oscuro' : '☀ Modo claro';
+  themeToggle.setAttribute('aria-pressed', String(theme === 'light'));
+  if (persist) {
+    try { localStorage.setItem('theme', theme); } catch (e) { /* almacenamiento no disponible */ }
+  }
+  // El loop no corre en pausa / game over: repintar una vez
+  if (current && next) { draw(); drawNext(); }
+}
+
+function loadTheme() {
+  try { return localStorage.getItem('theme'); } catch (e) { return null; }
+}
+
 function init() {
   board = createBoard();
   score = 0;
@@ -301,4 +338,10 @@ document.addEventListener('keydown', e => {
 
 restartBtn.addEventListener('click', init);
 
+themeToggle.addEventListener('click', () => {
+  applyTheme(theme === 'light' ? 'dark' : 'light', true);
+  themeToggle.blur(); // evita que Espacio (caída) active el botón
+});
+
+applyTheme(loadTheme() === 'light' ? 'light' : 'dark', false);
 init();

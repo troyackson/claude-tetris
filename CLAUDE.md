@@ -18,6 +18,8 @@ Three files, all logic in `game.js` (script-global state, no modules):
 - `game.js` — module-level `let` state (`board`, `current`, `next`, `score`, ...) reset by `init()`. Loop is `requestAnimationFrame` → `loop(ts)` accumulates `dropAccum` against `dropInterval`, then `draw()`. Input handled in one `keydown` listener.
 - Piece/board cells store color index 1–7 (`0` = empty); `PIECES` and `COLORS` are indexed by that same number, so adding a piece means updating both and the `Math.random()*7` in `randomPiece`.
 
+Theming: `style.css` defines colors as CSS variables (`:root` = dark default, `[data-theme="light"]` override). `applyTheme()` in `game.js` sets `data-theme`, caches `--grid`/`--highlight` for the canvas, picks `COLORS` vs `COLORS_LIGHT` (keep both in sync), persists to `localStorage`, and repaints once (loop is stopped when paused/game over).
+
 Gotchas:
 
 - `COLS`/`ROWS`/`BLOCK` must match the `<canvas id="board">` `width`/`height` in `index.html` (`COLS*BLOCK` × `ROWS*BLOCK`). Next-piece preview uses its own hardcoded 30px block and 4×4 grid.
