@@ -1,0 +1,99 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+concurrency:
+  group: issue-triage-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    # Solo issues (no PRs), no bots, y en "edited" solo si cambió título o descripción
+    if: |
+      github.event.issue.pull_request == null &&
+      !endsWith(github.actor, '[bot]') &&
+      (github.event.action == 'opened' ||
+       github.event.changes.title != null ||
+       github.event.changes.body != null)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Ensure triage labels exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          create() { gh label create "$1" --color "$2" --description "$3" --force; }
+          create "area:gameplay"  "1d76db" "Piezas, colisiones, rotación, líneas"
+          create "area:rendering" "5319e7" "Dibujo en canvas"
+          create "area:input"     "0e8a16" "Teclado y controles"
+          create "area:scoring"   "fbca04" "Puntaje, nivel y velocidad"
+          create "area:ui"        "c5def5" "HTML/CSS, HUD y overlays"
+          create "area:ci"        "bfdadc" "Workflows e infraestructura"
+          create "priority:high"   "b60205" "Prioridad alta"
+          create "priority:medium" "d93f0b" "Prioridad media"
+          create "priority:low"    "0e8a16" "Prioridad baja"
+
+      - name: Triage issue with Claude
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowedTools "Read,Glob,Grep,Write,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh label list:*)"'
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE: ${{ github.event.issue.number }}
+            EVENTO: ${{ github.event.action }}
+
+            Eres el agente de triage de este repositorio (Tetris en JavaScript vanilla). Analiza el issue #${{ github.event.issue.number }}, asigna labels y publica un diagnóstico técnico que el equipo usará después para implementar la solución. Escribe todo en español.
+
+            Pasos:
+            1. Lee el issue con `gh issue view ${{ github.event.issue.number }} --comments`. Lee CLAUDE.md como mapa del proyecto y luego el código relevante (game.js, index.html) para basar el diagnóstico en el código real.
+            2. Labels (usa `gh label list` para ver los disponibles). Asigna con `gh issue edit ${{ github.event.issue.number }} --add-label ...`:
+               - Exactamente 1 de tipo: bug, enhancement, documentation o question.
+               - Al menos 1 de área: area:gameplay, area:rendering, area:input, area:scoring, area:ui, area:ci.
+               - Exactamente 1 de prioridad: priority:high, priority:medium o priority:low.
+               - Opcionales si aplican: good first issue, duplicate, invalid, accessibility.
+               - Si EVENTO es "edited", quita con `--remove-label` los labels de tipo/área/prioridad que ya no apliquen. Nunca toques wontfix ni help wanted.
+            3. Escribe el diagnóstico en el archivo `triage-comment.md` y publícalo con:
+               `gh issue comment ${{ github.event.issue.number }} --edit-last --create-if-none --body-file triage-comment.md`
+               (así se actualiza un único comentario en vez de crear uno nuevo).
+
+            Formato del comentario:
+            ```
+            <!-- claude-issue-triage -->
+            ## 🔍 Diagnóstico automático (Claude)
+            **Resumen:** una o dos frases.
+            **Tipo / Área / Prioridad:** con justificación breve.
+
+            ### Análisis del problema
+            Causa probable; comportamiento esperado vs. actual.
+
+            ### Código involucrado
+            Archivos, líneas y funciones (ej. `game.js:123` `tryRotate`).
+
+            ### Propuesta de solución
+            Pasos concretos de implementación.
+
+            ### Criterios de aceptación
+            - [ ] ...
+
+            ### Riesgos / casos borde
+
+            ### Preguntas abiertas
+            Solo si el issue es ambiguo.
+
+            _Actualizado por evento: EVENTO_
+            ```
+
+            Restricciones: no modifiques código del repositorio, no abras PRs, no cambies el título ni el cuerpo del issue. Si el issue no es sobre el proyecto o es spam, usa el label invalid y explícalo brevemente en el comentario.
